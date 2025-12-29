@@ -42,7 +42,7 @@ def parse_gsa_file(file_obj):
         "Major axis shear check", "Minor axis shear check",
         "Major axis bending check", "Minor axis bending check",
         "Torsion check", "Combined biaxial bending and compression check",
-        "Axial tension check", "Combined biaxial bending and tension check"
+        "Axial tension check", "Axial compression check", "Combined biaxial bending and tension check"
     ]
     target_buckling = [
         "Check axial buckling major axis", "Check axial buckling minor axis",
