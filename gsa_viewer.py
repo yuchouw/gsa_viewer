@@ -13,7 +13,7 @@ import altair as alt
 # ==========================================
 def parse_gsa_file(file_obj):
     """
-    Parses the GSA CSV file. 
+    Parses the GSA CSV file.
     Handles basic text parsing for Input Data, Effective Lengths, and Design Checks.
     Attempts to parse Force/Point tables if they exist in standard GSA table format.
     """
@@ -493,208 +493,262 @@ if uploaded_file:
     # --- PRINT CONTROLS ---
     col_p1, col_p2 = st.columns([1, 4])
     with col_p1:
-        if st.button("🖨️ Print to PDF"):
-            components.html("<script>window.print();</script>", height=0, width=0)
-
-    with col_p2:
         expand_all = st.checkbox("Expand all details (for printing)", value=False)
 
-    # Inject CSS for printing
-    st.markdown("""
-        <style>
-            @media print {
-                html, body {
-                    height: auto !important;
-                    overflow: visible !important;
-                }
-                .stApp {
-                    height: auto !important;
-                    overflow: visible !important;
-                }
-                .block-container {
-                    padding: 0 !important;
-                    margin: 0 !important;
-                    max-width: 100% !important;
-                    overflow: visible !important;
-                }
-                #MainMenu, header, footer, [data-testid="stSidebar"] {
-                    display: none !important;
-                }
-                .stFileUploader, .stButton, [data-testid="stCheckbox"] {
-                    display: none !important;
-                }
-                * {
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                }
-            }
-        </style>
-    """, unsafe_allow_html=True)
+    # WRAP REPORT CONTENT IN CONTAINER FOR SCREENSHOT
+    with st.container():
+        st.markdown('<span id="report_start_marker"></span>', unsafe_allow_html=True)
 
-    # --- DASHBOARD SUMMARY ---
-    total_local = len(data['local_checks'])
-    total_buckling = len(data['buckling_checks'])
+        # --- DASHBOARD SUMMARY ---
+        total_local = len(data['local_checks'])
+        total_buckling = len(data['buckling_checks'])
 
-    max_local = max([c['util'] for c in data['local_checks']]) if total_local > 0 else 0.0
-    max_buckl = max([c['util'] for c in data['buckling_checks']]) if total_buckling > 0 else 0.0
+        max_local = max([c['util'] for c in data['local_checks']]) if total_local > 0 else 0.0
+        max_buckl = max([c['util'] for c in data['buckling_checks']]) if total_buckling > 0 else 0.0
 
-    member_val = data['metadata'].get('member', 'N/A')
-    combo_val = data['metadata'].get('combo', 'Combination Case: N/A')
+        member_val = data['metadata'].get('member', 'N/A')
+        combo_val = data['metadata'].get('combo', 'Combination Case: N/A')
 
-    # Top Row Metrics
-    col_sum1, col_sum2, col_sum3 = st.columns(3)
-    col_sum1.metric("Member List", member_val)
-    col_sum2.metric("Max Local Util", f"{max_local:.3f}", delta_color="inverse" if max_local > 1.0 else "normal")
-    col_sum3.metric("Max Buckling Util", f"{max_buckl:.3f}", delta_color="inverse" if max_buckl > 1.0 else "normal")
+        # Top Row Metrics
+        col_sum1, col_sum2, col_sum3 = st.columns(3)
+        col_sum1.metric("Member List", member_val)
+        col_sum2.metric("Max Local Util", f"{max_local:.3f}", delta_color="inverse" if max_local > 1.0 else "normal")
+        col_sum3.metric("Max Buckling Util", f"{max_buckl:.3f}", delta_color="inverse" if max_buckl > 1.0 else "normal")
 
-    # Combination Case
-    if ':' in combo_val:
-        parts = combo_val.split(':', 1)
-        c_title = parts[0].strip()
-        c_desc = parts[1].strip()
-        st.markdown(f"**{c_title}**")
+        # Combination Case
+        if ':' in combo_val:
+            parts = combo_val.split(':', 1)
+            c_title = parts[0].strip()
+            c_desc = parts[1].strip()
+            st.markdown(f"**{c_title}**")
 
-        sub_parts = [p.strip() for p in c_desc.split(':') if p.strip()]
-        if sub_parts:
-            c_cols = st.columns(2)
-            for i, sp in enumerate(sub_parts):
-                with c_cols[i % 2]:
-                    st.markdown(f"**{i + 1}.** {sp}")
+            sub_parts = [p.strip() for p in c_desc.split(':') if p.strip()]
+            if sub_parts:
+                c_cols = st.columns(2)
+                for i, sp in enumerate(sub_parts):
+                    with c_cols[i % 2]:
+                        st.markdown(f"**{i + 1}.** {sp}")
+            else:
+                st.markdown(f"{c_desc}")
         else:
-            st.markdown(f"{c_desc}")
-    else:
-        st.markdown(f"**{combo_val}**")
+            st.markdown(f"**{combo_val}**")
 
-    st.divider()
+        st.divider()
 
-    # --- SECTION 1: FORCE DIAGRAMS ---
-    st.header("Force Diagrams")
-    if data['forces']:
-        df = pd.DataFrame(data['forces'], columns=['Pos', 'Fx', 'Fy', 'Fz', 'Mxx', 'Myy', 'Mzz'])
-        df = df.sort_values('Pos')
+        # --- SECTION 1: FORCE DIAGRAMS ---
+        st.header("Force Diagrams")
+        if data['forces']:
+            df = pd.DataFrame(data['forces'], columns=['Pos', 'Fx', 'Fy', 'Fz', 'Mxx', 'Myy', 'Mzz'])
+            df = df.sort_values('Pos')
 
-        c1, c2, c3 = st.columns(3)
+            c1, c2, c3 = st.columns(3)
 
-        # Get dynamic units or default to kN/kNm
-        u_fx = data['units'].get('Fx', 'kN')
-        u_fy = data['units'].get('Fy', 'kN')
-        u_fz = data['units'].get('Fz', 'kN')
-        u_mx = data['units'].get('Mxx', 'kNm')
-        u_my = data['units'].get('Myy', 'kNm')
-        u_mz = data['units'].get('Mzz', 'kNm')
+            # Get dynamic units or default to kN/kNm
+            u_fx = data['units'].get('Fx', 'kN')
+            u_fy = data['units'].get('Fy', 'kN')
+            u_fz = data['units'].get('Fz', 'kN')
+            u_mx = data['units'].get('Mxx', 'kNm')
+            u_my = data['units'].get('Myy', 'kNm')
+            u_mz = data['units'].get('Mzz', 'kNm')
 
-        with c1:
-            st.subheader(f"Axial Force ({u_fx})")
-            chart = plot_with_zero_line(df, ['Fx'], ['#0000FF'], f"Force ({u_fx})")
-            st.altair_chart(chart, use_container_width=True)
+            with c1:
+                st.subheader(f"Axial Force ({u_fx})")
+                chart = plot_with_zero_line(df, ['Fx'], ['#0000FF'], f"Force ({u_fx})")
+                st.altair_chart(chart, use_container_width=True)
 
-        with c2:
-            st.subheader(f"Shear Forces ({u_fy})")
-            chart = plot_with_zero_line(df, ['Fy', 'Fz'], ['#00FF00', '#FF0000'], f"Force ({u_fy})")
-            st.altair_chart(chart, use_container_width=True)
+            with c2:
+                st.subheader(f"Shear Forces ({u_fy})")
+                chart = plot_with_zero_line(df, ['Fy', 'Fz'], ['#00FF00', '#FF0000'], f"Force ({u_fy})")
+                st.altair_chart(chart, use_container_width=True)
 
-        with c3:
-            st.subheader(f"Moments ({u_mx})")
-            chart = plot_with_zero_line(df, ['Mxx', 'Myy', 'Mzz'], ['#00FFFF', '#FF00FF', '#FFFF00'],
-                                        f"Moment ({u_mx})")
-            st.altair_chart(chart, use_container_width=True)
+            with c3:
+                st.subheader(f"Moments ({u_mx})")
+                chart = plot_with_zero_line(df, ['Mxx', 'Myy', 'Mzz'], ['#00FFFF', '#FF00FF', '#FFFF00'],
+                                            f"Moment ({u_mx})")
+                st.altair_chart(chart, use_container_width=True)
 
-    else:
-        st.info("No detailed force table found. (This is common for 'Brief' design outputs).")
-
-    # --- SECTION 2: INPUT DATA ---
-    st.header("Design Parameters")
-    with st.expander("Show Design Parameters", expanded=True):
-        all_lines = data['input_data'] + data['effective_lengths']
-
-        if all_lines:
-            cols = st.columns(3)
-            chunk_size = (len(all_lines) + 2) // 3
-
-            for i in range(3):
-                with cols[i]:
-                    start = i * chunk_size
-                    end = start + chunk_size
-                    subset = all_lines[start:end]
-
-                    html_content = ""
-                    for line in subset:
-                        tabs = line.count('\t')
-                        text = line.strip()
-                        if not text: continue
-
-                        is_bold = tabs <= 2
-                        visual_indent_level = max(0, tabs - 1)
-                        indent_px = visual_indent_level * 15
-
-                        weight = "bold" if is_bold else "normal"
-                        style = f"padding-left: {indent_px}px; margin-bottom: 2px; font-weight: {weight}; font-size: 0.9rem;"
-                        html_content += f"<div style='{style}'>{text}</div>"
-
-                    st.markdown(html_content, unsafe_allow_html=True)
         else:
-            st.info("No design parameters found.")
+            st.info("No detailed force table found. (This is common for 'Brief' design outputs).")
 
-    # --- SECTION 3: LOCAL CHECKS ---
-    st.header("Local Capacity Checks")
-    if data['local_checks']:
-        unique_checks = {}
-        for check in data['local_checks']:
-            name = check['name']
-            if name not in unique_checks or check['util'] > unique_checks[name]['util']:
-                unique_checks[name] = check
+        # --- SECTION 2: INPUT DATA ---
+        st.header("Design Parameters")
+        with st.expander("Show Design Parameters", expanded=True):
+            all_lines = data['input_data'] + data['effective_lengths']
 
-        final_checks = list(unique_checks.values())
+            if all_lines:
+                cols = st.columns(3)
+                chunk_size = (len(all_lines) + 2) // 3
 
-        cols = st.columns(2)
-        for i, check in enumerate(final_checks):
-            util = check['util']
-            icon = "🟢" if util <= 1.0 else "🔴"
-            name = check['name'].strip(':')
+                for i in range(3):
+                    with cols[i]:
+                        start = i * chunk_size
+                        end = start + chunk_size
+                        subset = all_lines[start:end]
 
-            left_text = f"**{name}**"
-            right_text = f"(Util: {util:.3f}) {icon}"
+                        html_content = ""
+                        for line in subset:
+                            tabs = line.count('\t')
+                            text = line.strip()
+                            if not text: continue
 
-            width = 36
-            label_text = f"{left_text:<{width // 2}}{right_text:>{width // 2}}"
-            label = label_text.replace(" ", "\u00A0")
+                            is_bold = tabs <= 2
+                            visual_indent_level = max(0, tabs - 1)
+                            indent_px = visual_indent_level * 15
 
-            with cols[i % 2]:
-                with st.expander(label, expanded=expand_all):
-                    if check.get('split_data'):
-                        sd = check['split_data']
-                        # Render Header (skip first line which is title)
-                        render_check_lines(sd['header'][1:], -1)
+                            weight = "bold" if is_bold else "normal"
+                            style = f"padding-left: {indent_px}px; margin-bottom: 2px; font-weight: {weight}; font-size: 0.9rem;"
+                            html_content += f"<div style='{style}'>{text}</div>"
 
-                        c_lh, c_rh = st.columns(2)
-                        with c_lh:
-                            st.markdown("**Left Hand End Result**")
-                            render_check_lines(sd['lh']['lines'], sd['lh']['util'])
-                        with c_rh:
-                            st.markdown("**Right Hand End Result**")
-                            render_check_lines(sd['rh']['lines'], sd['rh']['util'])
-                    else:
+                        st.markdown(html_content, unsafe_allow_html=True)
+            else:
+                st.info("No design parameters found.")
+
+        # --- SECTION 3: LOCAL CHECKS ---
+        st.header("Local Capacity Checks")
+        if data['local_checks']:
+            unique_checks = {}
+            for check in data['local_checks']:
+                name = check['name']
+                if name not in unique_checks or check['util'] > unique_checks[name]['util']:
+                    unique_checks[name] = check
+
+            final_checks = list(unique_checks.values())
+
+            cols = st.columns(2)
+            for i, check in enumerate(final_checks):
+                util = check['util']
+                icon = "🟢" if util <= 1.0 else "🔴"
+                name = check['name'].strip(':')
+
+                # Label Logic
+                left_text = f"**{name}**"
+                right_text = f"(Util: {util:.3f}) {icon}"
+
+                width = 36
+                label_text = f"{left_text:<{width // 2}}{right_text:>{width // 2}}"
+                label = label_text.replace(" ", "\u00A0")
+
+                # Distribute into columns
+                with cols[i % 2]:
+                    with st.expander(label, expanded=expand_all):
+                        if check.get('split_data'):
+                            sd = check['split_data']
+                            # Render Header (skip first line which is title)
+                            render_check_lines(sd['header'][1:], -1)
+
+                            c_lh, c_rh = st.columns(2)
+                            with c_lh:
+                                st.markdown("**Left Hand End Result**")
+                                render_check_lines(sd['lh']['lines'], sd['lh']['util'])
+                            with c_rh:
+                                st.markdown("**Right Hand End Result**")
+                                render_check_lines(sd['rh']['lines'], sd['rh']['util'])
+                        else:
+                            render_check_lines(check['lines'][1:], util)
+        else:
+            st.info("No local capacity checks found.")
+
+        # --- SECTION 4: BUCKLING CHECKS ---
+        st.header("Buckling Capacity Checks")
+        if data['buckling_checks']:
+            cols = st.columns(2)
+            for i, check in enumerate(data['buckling_checks']):
+                util = check['util']
+                # Removed permutation string from label
+                icon = "🟢" if util <= 1.0 else "🔴"
+                name = check['name'].strip(':')
+
+                left_text = f"**{name}**"
+                right_text = f"(Util: {util:.3f}) {icon}"
+                width = 36
+                label_text = f"{left_text:<{width // 2}}{right_text:>{width // 2}}"
+                label = label_text.replace(" ", "\u00A0")
+
+                with cols[i % 2]:
+                    with st.expander(label, expanded=expand_all):
+                        # Skip the first line [1:] because it's duplicated in the expander title
                         render_check_lines(check['lines'][1:], util)
-    else:
-        st.info("No local capacity checks found.")
+        else:
+            st.info("No buckling capacity checks found.")
 
-    # --- SECTION 4: BUCKLING CHECKS ---
-    st.header("Buckling Capacity Checks")
-    if data['buckling_checks']:
-        cols = st.columns(2)
-        for i, check in enumerate(data['buckling_checks']):
-            util = check['util']
-            icon = "🟢" if util <= 1.0 else "🔴"
-            name = check['name'].strip(':')
 
-            left_text = f"**{name}**"
-            right_text = f"(Util: {util:.3f}) {icon}"
-            width = 36
-            label_text = f"{left_text:<{width // 2}}{right_text:>{width // 2}}"
-            label = label_text.replace(" ", "\u00A0")
+    # Function to handle export options (Download and Copy)
+    def render_export_options():
+        js = """
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
+        <script>
+        function getNode() {
+            var marker = parent.document.getElementById('report_start_marker');
+            var node = null;
+            if (marker) {
+                node = marker.closest('[data-testid="stVerticalBlock"]');
+            }
+            if (!node) {
+                node = parent.document.querySelector('.stApp');
+            }
+            return node;
+        }
 
-            with cols[i % 2]:
-                with st.expander(label, expanded=expand_all):
-                    render_check_lines(check['lines'][1:], util)
-    else:
-        st.info("No buckling capacity checks found.")
+        var options = {
+            pixelRatio: 3, 
+            backgroundColor: 'white'
+        };
+
+        function downloadHighRes() {
+            var node = getNode();
+            htmlToImage.toPng(node, options)
+                .then(function (dataUrl) {
+                    var link = document.createElement('a');
+                    link.download = 'high_res_dashboard.png';
+                    link.href = dataUrl;
+                    link.click();
+                })
+                .catch(function (error) {
+                    console.error('Download error:', error);
+                });
+        }
+
+        function copyToClipboard() {
+            var node = getNode();
+            var btn = document.getElementById('copyBtn');
+            var originalText = btn.innerText;
+            btn.innerText = 'Processing...';
+
+            htmlToImage.toBlob(node, options)
+                .then(function (blob) {
+                    navigator.clipboard.write([
+                        new ClipboardItem({ 'image/png': blob })
+                    ]).then(function () {
+                        btn.innerText = '✅ Copied!';
+                        setTimeout(function() { btn.innerText = originalText; }, 2000);
+                    }).catch(function (error) {
+                        console.error('Clipboard write error:', error);
+                        btn.innerText = '❌ Error';
+                        setTimeout(function() { btn.innerText = originalText; }, 2000);
+                    });
+                })
+                .catch(function (error) {
+                    console.error('Generation error:', error);
+                    btn.innerText = '❌ Error';
+                    setTimeout(function() { btn.innerText = originalText; }, 2000);
+                });
+        }
+        </script>
+
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button onclick="downloadHighRes()" style="
+                background-color: #0078D4; color: white; border: none; padding: 10px 20px; 
+                border-radius: 5px; cursor: pointer; font-weight: bold;">
+                📥 Download PNG
+            </button>
+            <button id="copyBtn" onclick="copyToClipboard()" style="
+                background-color: #2b88d8; color: white; border: none; padding: 10px 20px; 
+                border-radius: 5px; cursor: pointer; font-weight: bold;">
+                📋 Copy to Clipboard
+            </button>
+        </div>
+        """
+        components.html(js, height=60)
+
+
+    render_export_options()
